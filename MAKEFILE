@@ -1,0 +1,12 @@
+CXX = g++
+CXXFLAGS = -std=c++17 -Iinclude -Wall
+
+SRC = $(wildcard src/*.cpp)
+OBJ = $(SRC:.cpp=.o)
+TARGET = main
+
+$(TARGET): $(OBJ)
+	$(CXX) $(OBJ) -o $(TARGET)
+
+clean:
+	rm -f src/*.o $(TARGET)
