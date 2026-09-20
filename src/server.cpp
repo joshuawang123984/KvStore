@@ -7,6 +7,66 @@
 #include <stdexcept>
 #include <cstring>
 
+std::string Server::parseGet(std::string command)
+{
+    return command;
+}
+std::string Server::parseSet(std::string command)
+{
+    return command;
+}
+std::string Server::parseDelete(std::string command)
+{
+    return command;
+}
+
+std::string Server::parseCommand(std::string command)
+{
+    // clears preceding white space
+    size_t first = command.find_first_not_of(" \t\n\r");
+    if (first != std::string::npos)
+    {
+        command.erase(0, first);
+    }
+    else
+    {
+        return "Cannot process empty command.";
+    }
+
+    if (command.length() < 3)
+    {
+        return "Invalid command";
+    }
+
+    std::string func = command.substr(0, 3);
+    for (char &c : func)
+        c = std::tolower(static_cast<unsigned char>(c));
+
+    if (func == "get")
+    {
+        return parseGet(command);
+    }
+    else if (func == "set")
+    {
+        return parseSet(command);
+    }
+
+    if (command.length() < 6)
+    {
+        return "Invalid command";
+    }
+
+    std::string func = command.substr(0, 6);
+    for (char &c : func)
+        c = std::tolower(static_cast<unsigned char>(c));
+    if (func == "delete")
+    {
+        return parseDelete(command);
+    }
+
+    return "Invalid command.";
+}
+
 void Server::start(int port)
 {
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
