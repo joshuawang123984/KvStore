@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <stdexcept>
+#include <cstring>
 
 void Server::start(int port)
 {
@@ -72,6 +73,21 @@ void Server::start(int port)
     buffer[bytes_received] = '\0';
 
     std::cout << "received: " << buffer << "\n";
+
+    const char *response = "from server!\n";
+
+    int bytes_sent = send(
+        client_fd,
+        response,
+        strlen(response),
+        0);
+
+    if (bytes_sent == -1)
+    {
+        close(client_fd);
+        close(server_fd);
+        throw std::runtime_error("Failed to send data");
+    }
 
     close(client_fd);
     close(server_fd);
