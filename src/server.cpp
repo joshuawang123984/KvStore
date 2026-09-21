@@ -108,6 +108,13 @@ void Server::start(int port)
         throw std::runtime_error("Failed to create socket");
     }
 
+    int opt = 1;
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1)
+    {
+        close(server_fd);
+        throw std::runtime_error("Failed to set socket options");
+    }
+
     sockaddr_in address{};
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
@@ -148,39 +155,45 @@ void Server::start(int port)
     std::cout << "client connected!\n";
 
     char buffer[1024];
-
-    int bytes_received = recv(
-        client_fd,
-        buffer,
-        sizeof(buffer) - 1,
-        0);
-
-    if (bytes_received == -1)
+    while (true)
     {
-        close(client_fd);
-        close(server_fd);
-        throw std::runtime_error("Failed to receive data");
+        int bytes_received = recv(
+            client_fd,
+            buffer,
+            sizeof(buffer) - 1,
+            0);
+
+        if (bytes_received == -1)
+        {
+            close(client_fd);
+            close(server_fd);
+            throw std::runtime_error("Failed to receive data");
+        }
+
+        buffer[bytes_received] = '\0';
+
+        if (std::string(buffer).find_first_not_of(" \t\n\r") == std::string::npos)
+        {
+            continue;
+        }
+
+        std::cout << "received: " << buffer << "\n";
+
+        std::string response = parseCommand(buffer) + "\n";
+
+        int bytes_sent = send(
+            client_fd,
+            response.c_str(),
+            response.size(),
+            0);
+
+        if (bytes_sent == -1)
+        {
+            close(client_fd);
+            close(server_fd);
+            throw std::runtime_error("Failed to send data");
+        }
     }
-
-    buffer[bytes_received] = '\0';
-
-    std::cout << "received: " << buffer << "\n";
-
-    std::string response = parseCommand(buffer);
-
-    int bytes_sent = send(
-        client_fd,
-        response.c_str(),
-        response.size(),
-        0);
-
-    if (bytes_sent == -1)
-    {
-        close(client_fd);
-        close(server_fd);
-        throw std::runtime_error("Failed to send data");
-    }
-
     close(client_fd);
     close(server_fd);
 }
