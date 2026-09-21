@@ -9,15 +9,36 @@
 
 std::string Server::parseGet(std::string command)
 {
-    return command;
+    std::string variable = command;
+    if (store.get(variable).has_value())
+    {
+        return store.get(variable).value();
+    }
+
+    return "Variable not found.";
 }
 std::string Server::parseSet(std::string command)
 {
-    return command;
+    size_t variableEnd = command.find_first_of(" \t\n\r");
+    std::string variable = command.substr(0, variableEnd);
+
+    std::string leftover = command.substr(variableEnd);
+    size_t valueStart = leftover.find_first_not_of(" \t\n\r");
+
+    std::string value = leftover.substr(valueStart);
+
+    store.set(variable, value);
+    return variable + " set with the value of: " + value;
 }
 std::string Server::parseDelete(std::string command)
 {
-    return command;
+    std::string variable = command;
+    if (store.remove(variable))
+    {
+        return "Variable successfully deleted.";
+    }
+
+    return "Variable not found.";
 }
 
 std::string Server::parseCommand(std::string command)
@@ -33,6 +54,13 @@ std::string Server::parseCommand(std::string command)
         return "Cannot process empty command.";
     }
 
+    size_t last = command.find_last_not_of(" \t\n\r");
+
+    if (last != std::string::npos)
+    {
+        command.erase(last + 1);
+    }
+
     if (command.length() < 3)
     {
         return "Invalid command";
@@ -42,13 +70,15 @@ std::string Server::parseCommand(std::string command)
     for (char &c : func)
         c = std::tolower(static_cast<unsigned char>(c));
 
+    size_t variableStart = command.substr(3).find_first_not_of(" \t\n\r");
+
     if (func == "get")
     {
-        return parseGet(command);
+        return parseGet(command.substr(3 + variableStart));
     }
     else if (func == "set")
     {
-        return parseSet(command);
+        return parseSet(command.substr(3 + variableStart));
     }
 
     if (command.length() < 6)
@@ -56,12 +86,14 @@ std::string Server::parseCommand(std::string command)
         return "Invalid command";
     }
 
-    std::string func = command.substr(0, 6);
+    func = command.substr(0, 6);
     for (char &c : func)
         c = std::tolower(static_cast<unsigned char>(c));
+    variableStart = command.substr(6).find_first_not_of(" \t\n\r");
+
     if (func == "delete")
     {
-        return parseDelete(command);
+        return parseDelete(command.substr(6 + variableStart));
     }
 
     return "Invalid command.";
@@ -134,12 +166,12 @@ void Server::start(int port)
 
     std::cout << "received: " << buffer << "\n";
 
-    const char *response = "from server!\n";
+    std::string response = parseCommand(buffer);
 
     int bytes_sent = send(
         client_fd,
-        response,
-        strlen(response),
+        response.c_str(),
+        response.size(),
         0);
 
     if (bytes_sent == -1)
