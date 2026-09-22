@@ -11,5 +11,8 @@ private:
     std::string parseGet(std::string command);
     std::string parseSet(std::string command);
     std::string parseDelete(std::string command);
+
+    void handleClient(int client_fd);
+
     KVStore store;
 };

@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <stdexcept>
 #include <cstring>
+#include <thread>
 
 std::string Server::parseGet(std::string command)
 {
@@ -99,6 +100,66 @@ std::string Server::parseCommand(std::string command)
     return "Invalid command.";
 }
 
+void Server::handleClient(int client_fd)
+{
+    char buffer[1024];
+    std::string pending;
+
+    while (true)
+    {
+        int bytes_received = recv(
+            client_fd,
+            buffer,
+            sizeof(buffer) - 1,
+            0);
+
+        if (bytes_received == -1)
+        {
+            close(client_fd);
+            throw std::runtime_error("Failed to receive data");
+        }
+
+        if (bytes_received == 0)
+        {
+            break;
+        }
+
+        pending.append(buffer, bytes_received);
+        size_t newLine;
+
+        while ((newLine = pending.find('\n')) != std::string::npos)
+        {
+            std::string command = pending.substr(0, newLine);
+            pending.erase(0, newLine + 1);
+
+            if (!command.empty() && command.back() == '\r')
+            {
+                command.pop_back();
+            }
+
+            if (command.find_first_not_of(" \t\r") == std::string::npos)
+            {
+                continue;
+            }
+
+            std::string response = parseCommand(command) + "\n";
+
+            int bytes_sent = send(
+                client_fd,
+                response.c_str(),
+                response.size(),
+                0);
+
+            if (bytes_sent == -1)
+            {
+                close(client_fd);
+                throw std::runtime_error("Failed to send data");
+            }
+        }
+    }
+    close(client_fd);
+}
+
 void Server::start(int port)
 {
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -138,79 +199,31 @@ void Server::start(int port)
 
     std::cout << "server listening on port " << port << "\n";
 
-    sockaddr_in client_address{};
-    socklen_t client_address_size = sizeof(client_address);
-
-    int client_fd = accept(
-        server_fd,
-        reinterpret_cast<sockaddr *>(&client_address),
-        &client_address_size);
-
-    if (client_fd == -1)
-    {
-        close(server_fd);
-        throw std::runtime_error("Failed to accept client");
-    }
-
-    std::cout << "client connected!\n";
-
-    char buffer[1024];
-    std::string pending;
-
     while (true)
     {
-        int bytes_received = recv(
-            client_fd,
-            buffer,
-            sizeof(buffer) - 1,
-            0);
+        sockaddr_in client_address{};
+        socklen_t client_address_size = sizeof(client_address);
 
-        if (bytes_received == -1)
+        int client_fd = accept(
+            server_fd,
+            reinterpret_cast<sockaddr *>(&client_address),
+            &client_address_size);
+
+        if (client_fd == -1)
         {
-            close(client_fd);
             close(server_fd);
-            throw std::runtime_error("Failed to receive data");
+            throw std::runtime_error("Failed to accept client");
         }
 
-        if (bytes_received == 0)
-        {
-            break;
-        }
+        std::cout << "client connected!\n";
 
-        pending.append(buffer, bytes_received);
-        size_t newLine;
+        std::thread client_thread(
+            &Server::handleClient,
+            this,
+            client_fd);
 
-        while ((newLine = pending.find('\n')) != std::string::npos)
-        {
-            std::string command = pending.substr(0, newLine);
-            pending.erase(0, newLine + 1);
-
-            if (!command.empty() && command.back() == '\r')
-            {
-                command.pop_back();
-            }
-
-            if (command.find_first_not_of(" \t\r") == std::string::npos)
-            {
-                continue;
-            }
-
-            std::string response = parseCommand(command) + "\n";
-
-            int bytes_sent = send(
-                client_fd,
-                response.c_str(),
-                response.size(),
-                0);
-
-            if (bytes_sent == -1)
-            {
-                close(client_fd);
-                close(server_fd);
-                throw std::runtime_error("Failed to send data");
-            }
-        }
+        client_thread.detach();
     }
-    close(client_fd);
+
     close(server_fd);
 }
