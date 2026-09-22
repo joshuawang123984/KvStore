@@ -155,6 +155,8 @@ void Server::start(int port)
     std::cout << "client connected!\n";
 
     char buffer[1024];
+    std::string pending;
+
     while (true)
     {
         int bytes_received = recv(
@@ -170,28 +172,43 @@ void Server::start(int port)
             throw std::runtime_error("Failed to receive data");
         }
 
-        buffer[bytes_received] = '\0';
-
-        if (std::string(buffer).find_first_not_of(" \t\n\r") == std::string::npos)
+        if (bytes_received == 0)
         {
-            continue;
+            break;
         }
 
-        std::cout << "received: " << buffer << "\n";
+        pending.append(buffer, bytes_received);
+        size_t newLine;
 
-        std::string response = parseCommand(buffer) + "\n";
-
-        int bytes_sent = send(
-            client_fd,
-            response.c_str(),
-            response.size(),
-            0);
-
-        if (bytes_sent == -1)
+        while ((newLine = pending.find('\n')) != std::string::npos)
         {
-            close(client_fd);
-            close(server_fd);
-            throw std::runtime_error("Failed to send data");
+            std::string command = pending.substr(0, newLine);
+            pending.erase(0, newLine + 1);
+
+            if (!command.empty() && command.back() == '\r')
+            {
+                command.pop_back();
+            }
+
+            if (command.find_first_not_of(" \t\r") == std::string::npos)
+            {
+                continue;
+            }
+
+            std::string response = parseCommand(command) + "\n";
+
+            int bytes_sent = send(
+                client_fd,
+                response.c_str(),
+                response.size(),
+                0);
+
+            if (bytes_sent == -1)
+            {
+                close(client_fd);
+                close(server_fd);
+                throw std::runtime_error("Failed to send data");
+            }
         }
     }
     close(client_fd);
