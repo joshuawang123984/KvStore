@@ -2,6 +2,8 @@
 
 bool KVStore::set(const std::string &key, const std::string &value)
 {
+    std::lock_guard<std::mutex> lock(mutex);
+
     if (data.find(key) != data.end())
     {
         return false;
@@ -12,6 +14,8 @@ bool KVStore::set(const std::string &key, const std::string &value)
 }
 std::optional<std::string> KVStore::get(const std::string &key)
 {
+    std::lock_guard<std::mutex> lock(mutex);
+
     if (data.find(key) != data.end())
     {
         return data[key];
@@ -21,6 +25,8 @@ std::optional<std::string> KVStore::get(const std::string &key)
 }
 bool KVStore::remove(const std::string &key)
 {
+    std::lock_guard<std::mutex> lock(mutex);
+
     if (data.find(key) != data.end())
     {
         data.erase(key);
