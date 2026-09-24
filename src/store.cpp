@@ -45,13 +45,18 @@ bool KVStore::set(const std::string &key, const std::string &value, bool updateL
         return false;
     }
 
-    data[key] = value;
-
     if (updateLog)
     {
         std::ofstream log(persistenceFile, std::ios::app);
+        if (!log)
+        {
+            return false;
+        }
+
         log << "SET " << key << " " << value << "\n";
     }
+
+    data[key] = value;
 
     return true;
 }
@@ -72,13 +77,18 @@ bool KVStore::remove(const std::string &key, bool updateLog)
 
     if (data.find(key) != data.end())
     {
-        data.erase(key);
-
         if (updateLog)
         {
             std::ofstream log(persistenceFile, std::ios::app);
+            if (!log)
+            {
+                return false;
+            }
+
             log << "DELETE " << key << "\n";
         }
+
+        data.erase(key);
 
         return true;
     }
