@@ -4,7 +4,8 @@
 class Server
 {
 public:
-    void start(int port);
+    Server(int port);
+    void start();
 
 private:
     std::string parseCommand(std::string command);
@@ -15,4 +16,5 @@ private:
     void handleClient(int client_fd);
 
     KVStore store;
+    int port;
 };

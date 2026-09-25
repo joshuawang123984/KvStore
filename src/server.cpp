@@ -8,6 +8,10 @@
 #include <cstring>
 #include <thread>
 
+Server::Server(int port) : port(port)
+{
+}
+
 std::string Server::parseGet(std::string command)
 {
     std::string variable = command;
@@ -160,7 +164,7 @@ void Server::handleClient(int client_fd)
     close(client_fd);
 }
 
-void Server::start(int port)
+void Server::start()
 {
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
 

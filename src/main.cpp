@@ -1,9 +1,18 @@
 #include "server.hpp"
+#include <iostream>
 
-int main()
+int main(int argc, char *argv[])
 {
-    Server server;
-    server.start(6379);
+    if (argc != 2)
+    {
+        std::cerr << "Usage: ./server <port>\n";
+        return 1;
+    }
+
+    int port = std::stoi(argv[1]);
+
+    Server server(port);
+    server.start();
 
     return 0;
 }
