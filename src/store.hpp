@@ -4,13 +4,21 @@
 #include <optional>
 #include <mutex>
 
+namespace constants
+{
+    const int OPERATION_LIMIT = 5;
+}
+
 class KVStore
 {
 private:
     std::unordered_map<std::string, std::string> data;
     std::mutex mutex;
 
+    int operationCount;
     const std::string persistenceFile = "data.log";
+
+    void compact();
 
 public:
     KVStore();

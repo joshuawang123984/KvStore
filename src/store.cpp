@@ -1,5 +1,29 @@
 #include "store.hpp"
 #include <fstream>
+#include <iostream>
+#include <filesystem>
+
+void KVStore::compact()
+{
+    std::ofstream temp("data.tmp");
+
+    if (!temp)
+    {
+        return;
+    }
+
+    for (const auto &[key, value] : data)
+    {
+        temp << "SET " << key << " " << value << "\n";
+    }
+
+    temp.close();
+
+    // replace data.log with data.tmp
+    std::filesystem::remove(persistenceFile);
+    std::filesystem::rename("data.tmp", persistenceFile);
+    operationCount = data.size();
+}
 
 KVStore::KVStore()
 {
@@ -7,13 +31,16 @@ KVStore::KVStore()
 
     if (!log)
     {
+        operationCount = 0;
         return; // start with empty map
     }
 
     std::string command;
+    int line = 0;
 
     while (std::getline(log, command))
     {
+        line++;
         if (command.substr(0, 3) == "SET")
         {
             // messy parsing
@@ -33,7 +60,13 @@ KVStore::KVStore()
             size_t first = args.find_first_not_of(" \t\n\r");
             remove(args.substr(first), false);
         }
+        else
+        {
+            std::cout << "Unknown Commnd at line: " << line << std::endl;
+        }
     }
+
+    operationCount = line;
 }
 
 bool KVStore::set(const std::string &key, const std::string &value, bool updateLog)
@@ -57,6 +90,15 @@ bool KVStore::set(const std::string &key, const std::string &value, bool updateL
     }
 
     data[key] = value;
+    if (updateLog)
+    {
+        operationCount++;
+
+        if (operationCount >= constants::OPERATION_LIMIT)
+        {
+            compact();
+        }
+    }
 
     return true;
 }
@@ -89,6 +131,15 @@ bool KVStore::remove(const std::string &key, bool updateLog)
         }
 
         data.erase(key);
+        if (updateLog)
+        {
+            operationCount++;
+
+            if (operationCount >= constants::OPERATION_LIMIT)
+            {
+                compact();
+            }
+        }
 
         return true;
     }
