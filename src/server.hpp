@@ -21,4 +21,5 @@ private:
     bool isPrimary;
     // might change in future to handle multiple replicaPorts
     int replicaPort;
+    int replica_fd = -1;
 };

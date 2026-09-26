@@ -7,6 +7,8 @@
 #include <stdexcept>
 #include <cstring>
 #include <thread>
+#include <arpa/inet.h>
+
 Server::Server(int port, bool isPrimary, int replicaPort) : port(port), isPrimary(isPrimary), replicaPort(replicaPort)
 {
 }
@@ -201,6 +203,40 @@ void Server::start()
     }
 
     std::cout << "server listening on port " << port << "\n";
+
+    if (isPrimary)
+    {
+        replica_fd = socket(AF_INET, SOCK_STREAM, 0);
+
+        if (replica_fd == -1)
+        {
+            close(server_fd);
+            throw std::runtime_error("Failed to create replica socket");
+        }
+
+        sockaddr_in replica_address{};
+
+        replica_address.sin_family = AF_INET;
+        replica_address.sin_port = htons(replicaPort);
+
+        inet_pton(
+            AF_INET,
+            "127.0.0.1",
+            &replica_address.sin_addr);
+
+        if (connect(
+                replica_fd,
+                reinterpret_cast<sockaddr *>(&replica_address),
+                sizeof(replica_address)) == -1)
+        {
+            close(replica_fd);
+            close(server_fd);
+            throw std::runtime_error("Failed to connect to replica");
+        }
+
+        std::cout << "Connected to replica on port "
+                  << replicaPort << "\n";
+    }
 
     while (true)
     {
