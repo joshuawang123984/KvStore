@@ -4,7 +4,7 @@
 class Server
 {
 public:
-    Server(int port);
+    Server(int port, bool isPrimary, int replicaPort = -1);
     void start();
 
 private:
@@ -17,4 +17,8 @@ private:
 
     KVStore store;
     int port;
+
+    bool isPrimary;
+    // might change in future to handle multiple replicaPorts
+    int replicaPort;
 };

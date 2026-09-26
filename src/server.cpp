@@ -7,8 +7,7 @@
 #include <stdexcept>
 #include <cstring>
 #include <thread>
-
-Server::Server(int port) : port(port)
+Server::Server(int port, bool isPrimary, int replicaPort) : port(port), isPrimary(isPrimary), replicaPort(replicaPort)
 {
 }
 
