@@ -1,8 +1,11 @@
 #include "server.hpp"
 #include <iostream>
+#include <csignal>
 
 int main(int argc, char *argv[])
 {
+    signal(SIGPIPE, SIG_IGN);
+
     if (argc < 3)
     {
         std::cerr << "Usage:\n";

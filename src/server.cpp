@@ -290,22 +290,6 @@ bool Server::connectToReplica()
         return false;
     }
 
-    int opt = 1;
-
-    if (setsockopt(
-            replica_fd,
-            SOL_SOCKET,
-            SO_NOSIGPIPE,
-            &opt,
-            sizeof(opt)) == -1)
-    {
-        close(replica_fd);
-        replica_fd = -1;
-
-        std::cerr << "Failed to set SO_NOSIGPIPE.\n";
-        return false;
-    }
-
     sockaddr_in replica_address{};
 
     replica_address.sin_family = AF_INET;
