@@ -15,6 +15,9 @@ private:
 
     void handleClient(int client_fd);
 
+    bool connectToReplica();
+    bool resyncReplica();
+
     KVStore store;
     int port;
 
@@ -22,4 +25,6 @@ private:
     // might change in future to handle multiple replicaPorts
     int replicaPort;
     int replica_fd = -1;
+
+    std::mutex replicaMutex;
 };

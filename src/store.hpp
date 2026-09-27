@@ -3,6 +3,7 @@
 #include <string>
 #include <optional>
 #include <mutex>
+#include <vector>
 
 namespace constants
 {

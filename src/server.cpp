@@ -16,9 +16,10 @@ Server::Server(int port, bool isPrimary, int replicaPort) : port(port), isPrimar
 std::string Server::parseGet(std::string command)
 {
     std::string variable = command;
-    if (store.get(variable).has_value())
+    auto res = store.get(variable);
+    if (res.has_value())
     {
-        return store.get(variable).value();
+        return res.value();
     }
 
     return "Variable not found.";
@@ -37,13 +38,32 @@ std::string Server::parseSet(std::string command)
 
     if (success && isPrimary)
     {
-        std::string replicationCommand = "SET " + variable + " " + value + "\n";
+        std::lock_guard<std::mutex> lock(replicaMutex);
 
-        send(
-            replica_fd,
-            replicationCommand.c_str(),
-            replicationCommand.size(),
-            0);
+        if (replica_fd == -1)
+        {
+            connectToReplica();
+        }
+
+        if (replica_fd != -1)
+        {
+            std::string replicationCommand = "SET " + variable + " " + value + "\n";
+
+            int bytesSent = send(
+                replica_fd,
+                replicationCommand.c_str(),
+                replicationCommand.size(),
+                0);
+
+            if (bytesSent == -1)
+            {
+                std::cerr << "Replica connection lost (Continuing with primray).\n";
+                close(replica_fd);
+                replica_fd = -1;
+
+                connectToReplica();
+            }
+        }
     }
 
     return variable + " set with the value of: " + value;
@@ -55,74 +75,69 @@ std::string Server::parseDelete(std::string command)
     {
         if (isPrimary)
         {
-            std::string replicationCommand = "DELETE " + variable + "\n";
+            std::lock_guard<std::mutex> lock(replicaMutex);
 
-            send(
-                replica_fd,
-                replicationCommand.c_str(),
-                replicationCommand.size(),
-                0);
+            if (replica_fd == -1)
+            {
+                connectToReplica();
+            }
+
+            if (replica_fd != -1)
+            {
+                std::string replicationCommand = "DELETE " + variable + "\n";
+
+                int bytesSent = send(
+                    replica_fd,
+                    replicationCommand.c_str(),
+                    replicationCommand.size(),
+                    0);
+
+                if (bytesSent == -1)
+                {
+                    std::cerr << "Replica connection lost (Continuing with primray).\n";
+                    close(replica_fd);
+                    replica_fd = -1;
+
+                    connectToReplica();
+                }
+            }
         }
-
         return "Variable successfully deleted.";
     }
-
     return "Variable not found.";
 }
 
 std::string Server::parseCommand(std::string command)
 {
-    // clears preceding white space
-    size_t first = command.find_first_not_of(" \t\n\r");
-    if (first != std::string::npos)
-    {
-        command.erase(0, first);
-    }
-    else
-    {
-        return "Cannot process empty command.";
-    }
+    std::string func = command.substr(
+        0,
+        command.find_first_of(" \t\n\r"));
 
-    size_t last = command.find_last_not_of(" \t\n\r");
-
-    if (last != std::string::npos)
-    {
-        command.erase(last + 1);
-    }
-
-    if (command.length() < 3)
-    {
-        return "Invalid command";
-    }
-
-    std::string func = command.substr(0, 3);
     for (char &c : func)
         c = std::tolower(static_cast<unsigned char>(c));
 
-    size_t variableStart = command.substr(3).find_first_not_of(" \t\n\r");
+    size_t argumentStart =
+        command.find_first_not_of(" \t\n\r", func.size());
 
     if (func == "get")
     {
-        return parseGet(command.substr(3 + variableStart));
-    }
-    else if (func == "set")
-    {
-        return parseSet(command.substr(3 + variableStart));
+        return parseGet(command.substr(argumentStart));
     }
 
-    if (command.length() < 6)
+    if (func == "set")
     {
-        return "Invalid command";
+        return parseSet(command.substr(argumentStart));
     }
-
-    func = command.substr(0, 6);
-    for (char &c : func)
-        c = std::tolower(static_cast<unsigned char>(c));
-    variableStart = command.substr(6).find_first_not_of(" \t\n\r");
 
     if (func == "delete")
     {
-        return parseDelete(command.substr(6 + variableStart));
+        return parseDelete(command.substr(argumentStart));
+    }
+
+    if (func == "sync")
+    {
+        store.clear();
+        return "";
     }
 
     return "Invalid command.";
@@ -144,7 +159,7 @@ void Server::handleClient(int client_fd)
         if (bytes_received == -1)
         {
             close(client_fd);
-            throw std::runtime_error("Failed to receive data");
+            return;
         }
 
         if (bytes_received == 0)
@@ -181,7 +196,7 @@ void Server::handleClient(int client_fd)
             if (bytes_sent == -1)
             {
                 close(client_fd);
-                throw std::runtime_error("Failed to send data");
+                return;
             }
         }
     }
@@ -229,36 +244,7 @@ void Server::start()
 
     if (isPrimary)
     {
-        replica_fd = socket(AF_INET, SOCK_STREAM, 0);
-
-        if (replica_fd == -1)
-        {
-            close(server_fd);
-            throw std::runtime_error("Failed to create replica socket");
-        }
-
-        sockaddr_in replica_address{};
-
-        replica_address.sin_family = AF_INET;
-        replica_address.sin_port = htons(replicaPort);
-
-        inet_pton(
-            AF_INET,
-            "127.0.0.1",
-            &replica_address.sin_addr);
-
-        if (connect(
-                replica_fd,
-                reinterpret_cast<sockaddr *>(&replica_address),
-                sizeof(replica_address)) == -1)
-        {
-            close(replica_fd);
-            close(server_fd);
-            throw std::runtime_error("Failed to connect to replica");
-        }
-
-        std::cout << "Connected to replica on port "
-                  << replicaPort << "\n";
+        connectToReplica();
     }
 
     while (true)
@@ -288,4 +274,109 @@ void Server::start()
     }
 
     close(server_fd);
+}
+
+bool Server::connectToReplica()
+{
+    if (replica_fd != -1)
+    {
+        return true;
+    }
+    replica_fd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (replica_fd == -1)
+    {
+        std::cerr << "Failed to create replica socket.\n";
+        return false;
+    }
+
+    int opt = 1;
+
+    if (setsockopt(
+            replica_fd,
+            SOL_SOCKET,
+            SO_NOSIGPIPE,
+            &opt,
+            sizeof(opt)) == -1)
+    {
+        close(replica_fd);
+        replica_fd = -1;
+
+        std::cerr << "Failed to set SO_NOSIGPIPE.\n";
+        return false;
+    }
+
+    sockaddr_in replica_address{};
+
+    replica_address.sin_family = AF_INET;
+    replica_address.sin_port = htons(replicaPort);
+
+    inet_pton(
+        AF_INET,
+        "127.0.0.1",
+        &replica_address.sin_addr);
+
+    if (connect(
+            replica_fd,
+            reinterpret_cast<sockaddr *>(&replica_address),
+            sizeof(replica_address)) == -1)
+    {
+        std::cerr << "Failed to reconnect to replica.\n";
+
+        close(replica_fd);
+        replica_fd = -1;
+
+        return false;
+    }
+
+    std::cout << "Connected to replica on port "
+              << replicaPort << "\n";
+
+    if (!resyncReplica())
+    {
+        close(replica_fd);
+        replica_fd = -1;
+
+        return false;
+    }
+
+    return true;
+}
+
+bool Server::resyncReplica()
+{
+    std::vector<std::pair<std::string, std::string>> snapshot =
+        store.snapshot();
+
+    std::string syncCommand = "SYNC\n";
+
+    if (send(
+            replica_fd,
+            syncCommand.c_str(),
+            syncCommand.size(),
+            0) == -1)
+    {
+        std::cerr << "Failed to send sync command.\n";
+        return false;
+    }
+
+    for (const auto &[key, value] : snapshot)
+    {
+        std::string command =
+            "SET " + key + " " + value + "\n";
+
+        if (send(
+                replica_fd,
+                command.c_str(),
+                command.size(),
+                0) == -1)
+        {
+            std::cerr << "Failed to send replica snapshot.\n";
+            return false;
+        }
+    }
+
+    std::cout << "replica resynchronized.\n";
+
+    return true;
 }
