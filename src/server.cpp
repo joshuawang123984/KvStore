@@ -33,7 +33,19 @@ std::string Server::parseSet(std::string command)
 
     std::string value = leftover.substr(valueStart);
 
-    store.set(variable, value);
+    bool success = store.set(variable, value);
+
+    if (success && isPrimary)
+    {
+        std::string replicationCommand = "SET " + variable + " " + value + "\n";
+
+        send(
+            replica_fd,
+            replicationCommand.c_str(),
+            replicationCommand.size(),
+            0);
+    }
+
     return variable + " set with the value of: " + value;
 }
 std::string Server::parseDelete(std::string command)
@@ -41,6 +53,17 @@ std::string Server::parseDelete(std::string command)
     std::string variable = command;
     if (store.remove(variable))
     {
+        if (isPrimary)
+        {
+            std::string replicationCommand = "DELETE " + variable + "\n";
+
+            send(
+                replica_fd,
+                replicationCommand.c_str(),
+                replicationCommand.size(),
+                0);
+        }
+
         return "Variable successfully deleted.";
     }
 
