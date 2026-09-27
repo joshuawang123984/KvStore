@@ -25,4 +25,7 @@ public:
     bool set(const std::string &key, const std::string &value, bool updateLog = true);
     std::optional<std::string> get(const std::string &key);
     bool remove(const std::string &key, bool updateLog = true);
+
+    std::vector<std::pair<std::string, std::string>> snapshot();
+    void clear();
 };

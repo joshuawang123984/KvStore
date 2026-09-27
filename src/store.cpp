@@ -146,3 +146,33 @@ bool KVStore::remove(const std::string &key, bool updateLog)
 
     return false;
 }
+
+std::vector<std::pair<std::string, std::string>> KVStore::snapshot()
+{
+    std::lock_guard<std::mutex> lock(mutex);
+
+    std::vector<std::pair<std::string, std::string>> result;
+
+    for (const auto &[key, value] : data)
+    {
+        result.push_back({key, value});
+    }
+
+    return result;
+}
+
+void KVStore::clear()
+{
+    std::lock_guard<std::mutex> lock(mutex);
+
+    data.clear();
+
+    std::ofstream log(persistenceFile, std::ios::trunc);
+
+    if (!log)
+    {
+        throw std::runtime_error("Failed to clear persistence log");
+    }
+
+    operationCount = 0;
+}
