@@ -9,7 +9,7 @@
 #include <thread>
 #include <arpa/inet.h>
 
-Server::Server(int port, bool isPrimary, int replicaPort) : port(port), isPrimary(isPrimary), replicaPort(replicaPort)
+Server::Server(int port, bool isPrimary) : port(port), isPrimary(isPrimary)
 {
 }
 
@@ -302,7 +302,7 @@ bool Server::connectToReplica(Replica &replica)
     sockaddr_in replica_address{};
 
     replica_address.sin_family = AF_INET;
-    replica_address.sin_port = htons(replicaPort);
+    replica_address.sin_port = htons(replica.port);
 
     inet_pton(
         AF_INET,
@@ -323,7 +323,7 @@ bool Server::connectToReplica(Replica &replica)
     }
 
     std::cout << "Connected to replica on port "
-              << replicaPort << "\n";
+              << replica.port << "\n";
 
     if (!resyncReplica(replica))
     {

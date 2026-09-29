@@ -11,7 +11,7 @@ struct Replica
 class Server
 {
 public:
-    Server(int port, bool isPrimary, int replicaPort = -1);
+    Server(int port, bool isPrimary);
     void start();
 
 private:
@@ -29,7 +29,6 @@ private:
     int port;
 
     bool isPrimary;
-    int replicaPort;
     std::vector<Replica> replicas;
 
     std::mutex replicaMutex;

@@ -2,6 +2,14 @@
 #include <iostream>
 #include <csignal>
 
+/*
+TODO:
+    How to push replica structs into servers replicas vector?
+    MAKE sure sets and deletes dont do anything unless server is primary. ->
+    Move logic into the if primary check rather than actually doing something then checking
+    Also change main to accompany this no port constructor. or maybe accept and directly push back to vector?
+*/
+
 int main(int argc, char *argv[])
 {
     signal(SIGPIPE, SIG_IGN);
@@ -26,7 +34,7 @@ int main(int argc, char *argv[])
         }
 
         int replicaPort = std::stoi(argv[3]);
-        Server server(port, true, replicaPort);
+        Server server(port, true);
         server.start();
     }
 
