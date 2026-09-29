@@ -14,12 +14,13 @@ PIDS=()
 REPLICA_PORTS=()
 
 cleanup() {
-    echo "cleaning up..."
+    echo "Cleaning up..."
 
     for pid in "${PIDS[@]}"; do
         kill "$pid" 2>/dev/null
     done
 
+    wait 2>/dev/null
     rm -rf "$TMP_DIR"
 }
 
@@ -33,7 +34,7 @@ for ((i = 1; i < NUM_PROCESSES; i++)); do
 
     (
         cd "$TMP_DIR/replica$i"
-        "$SERVER" "$PORT" replica
+        exec "$SERVER" "$PORT" replica
     ) &
 
     PIDS+=($!)
@@ -50,7 +51,7 @@ mkdir -p "$TMP_DIR/primary"
 
 (
     cd "$TMP_DIR/primary"
-    "${PRIMARY_CMD[@]}"
+    exec "${PRIMARY_CMD[@]}"
 ) &
 
 PIDS+=($!)

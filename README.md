@@ -32,15 +32,13 @@ The project started as an in memory key value store and is being developed into 
 
 * **Log compaction**
 
-  * Periodically rewrites the log using the store's current state when file grows past a limit
+  * Rewrites the log using the store's current state when file grows past a limit
   * Prevents the append only log from growing indefinitely
 
 * **Stress testing**
 
   * Concurrent clients performing thousands of operations
   * Validates thread safety and server behavior under concurrent load
-
-### Planned
 
 * **Replication**
 
@@ -49,8 +47,10 @@ The project started as an in memory key value store and is being developed into 
 
 * **Failure handling**
 
-  * Detect replica/node failures
-  * Explore recovery and failover
+  * Detect replica failures and continue Serving from the primary
+  * reconnect failed replicas, resync replica state
+
+### Planned
 
 * **Sharding**
 
@@ -90,7 +90,7 @@ When the log reaches a configured operation threshold, **log compaction** rewrit
 Start the server:
 
 ```bash
-./server <port_number>
+bash test_cluster.sh <# of processes>
 ```
 
 Connect using a TCP client:
@@ -103,16 +103,16 @@ Then:
 
 ```text
 SET name Joshua
-OK
+name set with the value of: Joshua **(this is program output, not user input)**
 
 GET name
-Joshua
+Joshua **(this is program output, not user input)**
 
 DELETE name
-OK
+Variable successfully deleted. **(this is program output, not user input)**
 
 GET name
-NOT_FOUND
+Variable not found. **(this is program output, not user input)**
 ```
 
 ## Building
@@ -133,7 +133,7 @@ make
 Run it:
 
 ```bash
-./server <port_number>
+bash test_cluster.sh <# of processes>
 ```
 
 Clean build artifacts:
@@ -152,9 +152,8 @@ The main areas explored are:
 * Client/server architecture
 * Concurrency and synchronization
 * Persistent storage
-* Write-ahead/append-only logging
+* Append only logging
 * Crash recovery
 * Log compaction
 * Replication
 * Fault tolerance
-* Distributed data partitioning
