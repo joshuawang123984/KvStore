@@ -56,7 +56,7 @@ std::string Server::parseSet(std::string command)
 
             if (replica.fd != -1)
             {
-                std::string replicationCommand = "SET " + variable + " " + value + "\n";
+                std::string replicationCommand = "REPL_SET " + variable + " " + value + "\n";
 
                 int bytesSent = send(
                     replica.fd,
@@ -96,7 +96,7 @@ std::string Server::parseDelete(std::string command)
 
                 if (replica.fd != -1)
                 {
-                    std::string replicationCommand = "DELETE " + variable + "\n";
+                    std::string replicationCommand = "REPL_DELETE " + variable + "\n";
 
                     int bytesSent = send(
                         replica.fd,
@@ -139,10 +139,28 @@ std::string Server::parseCommand(std::string command)
 
     if (func == "set")
     {
+        if (!isPrimary)
+        {
+            return "Sets are only allowed on the primary.";
+        }
         return parseSet(command.substr(argumentStart));
     }
 
     if (func == "delete")
+    {
+        if (!isPrimary)
+        {
+            return "Deletes are only allowed on the primary.";
+        }
+        return parseDelete(command.substr(argumentStart));
+    }
+
+    if (func == "repl_set")
+    {
+        return parseSet(command.substr(argumentStart));
+    }
+
+    if (func == "repl_delete")
     {
         return parseDelete(command.substr(argumentStart));
     }
