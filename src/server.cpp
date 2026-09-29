@@ -9,8 +9,15 @@
 #include <thread>
 #include <arpa/inet.h>
 
-Server::Server(int port, bool isPrimary) : port(port), isPrimary(isPrimary)
+Server::Server(int port, bool isPrimary, const std::vector<int> &replicaPorts) : port(port), isPrimary(isPrimary)
 {
+    for (int replicaPort : replicaPorts)
+    {
+        Replica temp = {};
+        temp.fd = -1;
+        temp.port = replicaPort;
+        replicas.push_back(temp);
+    }
 }
 
 std::string Server::parseGet(std::string command)

@@ -33,8 +33,13 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        int replicaPort = std::stoi(argv[3]);
-        Server server(port, true);
+        std::vector<int> replicaPorts;
+        for (int i = 3; i < argc; ++i)
+        {
+            replicaPorts.push_back(std::stoi(argv[i]));
+        }
+
+        Server server(port, true, replicaPorts);
         server.start();
     }
 

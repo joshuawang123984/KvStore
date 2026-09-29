@@ -11,7 +11,7 @@ struct Replica
 class Server
 {
 public:
-    Server(int port, bool isPrimary);
+    Server(int port, bool isPrimary, const std::vector<int> &replicaPorts = {});
     void start();
 
 private:
