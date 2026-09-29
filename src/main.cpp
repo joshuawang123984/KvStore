@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
 
     if (role == "primary")
     {
-        if (argc != 4)
+        if (argc < 4)
         {
             std::cerr << "Primary requires a replica port\n";
             return 1;
