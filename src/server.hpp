@@ -1,5 +1,12 @@
 #pragma once
 #include "store.hpp"
+#include <vector>
+
+struct Replica
+{
+    int fd = -1;
+    int port;
+};
 
 class Server
 {
@@ -15,16 +22,15 @@ private:
 
     void handleClient(int client_fd);
 
-    bool connectToReplica();
-    bool resyncReplica();
+    bool connectToReplica(Replica &replica);
+    bool resyncReplica(Replica &replica);
 
     KVStore store;
     int port;
 
     bool isPrimary;
-    // might change in future to handle multiple replicaPorts
     int replicaPort;
-    int replica_fd = -1;
+    std::vector<Replica> replicas;
 
     std::mutex replicaMutex;
 };
