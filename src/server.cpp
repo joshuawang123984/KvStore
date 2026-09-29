@@ -38,30 +38,33 @@ std::string Server::parseSet(std::string command)
 
     if (success && isPrimary)
     {
-        std::lock_guard<std::mutex> lock(replicaMutex);
-
-        if (replica_fd == -1)
+        for (int &fd : replica_fds)
         {
-            connectToReplica();
-        }
+            std::lock_guard<std::mutex> lock(replicaMutex);
 
-        if (replica_fd != -1)
-        {
-            std::string replicationCommand = "SET " + variable + " " + value + "\n";
-
-            int bytesSent = send(
-                replica_fd,
-                replicationCommand.c_str(),
-                replicationCommand.size(),
-                0);
-
-            if (bytesSent == -1)
+            if (fd == -1)
             {
-                std::cerr << "Replica connection lost (Continuing with primray).\n";
-                close(replica_fd);
-                replica_fd = -1;
+                connectToReplica(fd);
+            }
 
-                connectToReplica();
+            if (fd != -1)
+            {
+                std::string replicationCommand = "SET " + variable + " " + value + "\n";
+
+                int bytesSent = send(
+                    fd,
+                    replicationCommand.c_str(),
+                    replicationCommand.size(),
+                    0);
+
+                if (bytesSent == -1)
+                {
+                    std::cerr << "Replica connection lost (Continuing with primray).\n";
+                    close(fd);
+                    fd = -1;
+
+                    connectToReplica(fd);
+                }
             }
         }
     }
@@ -75,30 +78,33 @@ std::string Server::parseDelete(std::string command)
     {
         if (isPrimary)
         {
-            std::lock_guard<std::mutex> lock(replicaMutex);
-
-            if (replica_fd == -1)
+            for (int &fd : replica_fds)
             {
-                connectToReplica();
-            }
+                std::lock_guard<std::mutex> lock(replicaMutex);
 
-            if (replica_fd != -1)
-            {
-                std::string replicationCommand = "DELETE " + variable + "\n";
-
-                int bytesSent = send(
-                    replica_fd,
-                    replicationCommand.c_str(),
-                    replicationCommand.size(),
-                    0);
-
-                if (bytesSent == -1)
+                if (fd == -1)
                 {
-                    std::cerr << "Replica connection lost (Continuing with primray).\n";
-                    close(replica_fd);
-                    replica_fd = -1;
+                    connectToReplica(fd);
+                }
 
-                    connectToReplica();
+                if (fd != -1)
+                {
+                    std::string replicationCommand = "DELETE " + variable + "\n";
+
+                    int bytesSent = send(
+                        fd,
+                        replicationCommand.c_str(),
+                        replicationCommand.size(),
+                        0);
+
+                    if (bytesSent == -1)
+                    {
+                        std::cerr << "Replica connection lost (Continuing with primray).\n";
+                        close(fd);
+                        fd = -1;
+
+                        connectToReplica(fd);
+                    }
                 }
             }
         }
@@ -244,7 +250,10 @@ void Server::start()
 
     if (isPrimary)
     {
-        connectToReplica();
+        for (int &fd : replica_fds)
+        {
+            connectToReplica(fd);
+        }
     }
 
     while (true)
@@ -276,15 +285,15 @@ void Server::start()
     close(server_fd);
 }
 
-bool Server::connectToReplica()
+bool Server::connectToReplica(int &fd)
 {
-    if (replica_fd != -1)
+    if (fd != -1)
     {
         return true;
     }
-    replica_fd = socket(AF_INET, SOCK_STREAM, 0);
+    fd = socket(AF_INET, SOCK_STREAM, 0);
 
-    if (replica_fd == -1)
+    if (fd == -1)
     {
         std::cerr << "Failed to create replica socket.\n";
         return false;
@@ -301,14 +310,14 @@ bool Server::connectToReplica()
         &replica_address.sin_addr);
 
     if (connect(
-            replica_fd,
+            fd,
             reinterpret_cast<sockaddr *>(&replica_address),
             sizeof(replica_address)) == -1)
     {
         std::cerr << "Failed to reconnect to replica.\n";
 
-        close(replica_fd);
-        replica_fd = -1;
+        close(fd);
+        fd = -1;
 
         return false;
     }
@@ -316,10 +325,10 @@ bool Server::connectToReplica()
     std::cout << "Connected to replica on port "
               << replicaPort << "\n";
 
-    if (!resyncReplica())
+    if (!resyncReplica(fd))
     {
-        close(replica_fd);
-        replica_fd = -1;
+        close(fd);
+        fd = -1;
 
         return false;
     }
@@ -327,7 +336,7 @@ bool Server::connectToReplica()
     return true;
 }
 
-bool Server::resyncReplica()
+bool Server::resyncReplica(int &fd)
 {
     std::vector<std::pair<std::string, std::string>> snapshot =
         store.snapshot();
@@ -335,7 +344,7 @@ bool Server::resyncReplica()
     std::string syncCommand = "SYNC\n";
 
     if (send(
-            replica_fd,
+            fd,
             syncCommand.c_str(),
             syncCommand.size(),
             0) == -1)
@@ -350,7 +359,7 @@ bool Server::resyncReplica()
             "SET " + key + " " + value + "\n";
 
         if (send(
-                replica_fd,
+                fd,
                 command.c_str(),
                 command.size(),
                 0) == -1)
